@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=tf2patcher
+Exec=tf2patcher
+Icon=tf2patcher
+Categories=Utility;Development;
+Comment=Decal patcher for Team Fortress 2. Why do we call it a patcher anyway?
+Terminal=true

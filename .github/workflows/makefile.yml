@@ -1,0 +1,96 @@
+name: AppImage Build
+on:
+  push:
+    branches: ["current"]
+  pull_request:
+    branches: ["current"]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Type of build'
+        required: true
+        default: 'Release'
+        type: choice
+        options:
+          - Release
+          - Debug
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      APPIMAGE_EXTRACT_AND_RUN: 1
+      BUILD_TYPE: ${{ inputs.build_type || 'Release' }}
+      LINUXDEPLOY_VERSION: 1-alpha-20251107-1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2
+
+      - name: Cache LinuxDeploy
+        uses: actions/cache@v4
+        with:
+          path: linuxdeploy-x86_64.AppImage
+          key: linuxdeploy-${{ env.LINUXDEPLOY_VERSION }}
+
+      - name: Download LinuxDeploy
+        run: |
+          if [ ! -f linuxdeploy-x86_64.AppImage ]; then
+            wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/${{ env.LINUXDEPLOY_VERSION }}/linuxdeploy-x86_64.AppImage
+          fi
+          chmod +x linuxdeploy-x86_64.AppImage
+
+      - name: Build
+        run: make TARGET=64 MODE=${{ env.BUILD_TYPE }}
+
+      - name: Set build metadata
+        id: meta
+        run: |
+          TIMESTAMP=$(git log -1 --format=%cI)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "timestamp=${TIMESTAMP}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Warn if no artifact will be published
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/current'
+        run: |
+          echo "::warning::Manual dispatch on a non-current branch — the build will run but no release or PR artifact will be created."
+
+      - name: Create AppImage
+        run: |
+          export ARCH=x86_64
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir \
+            -e bin/tf2patcher \
+            -i tf2patcher.png \
+            -d tf2patcher.desktop \
+            --output appimage
+          mv tf2patcher-*.AppImage tf2patcher.AppImage
+
+      - name: Upload PR artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tf2patcher-pr-${{ github.event.number }}
+          path: tf2patcher.AppImage
+
+      - name: Continuous Release
+        if: >
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+          && github.ref == 'refs/heads/current'
+        uses: softprops/action-gh-release@4dd30955cca228da305ffee6fbc3fc1f95d447c2
+        with:
+          tag_name: continuous
+          name: "Latest Continuous Build"
+          body: |
+            Automated build from branch `current`.
+            Build type: ${{ env.BUILD_TYPE }}
+            Commit: ${{ github.sha }}
+            Built: ${{ steps.meta.outputs.timestamp }}
+          prerelease: true
+          files: |
+            tf2patcher.AppImage
