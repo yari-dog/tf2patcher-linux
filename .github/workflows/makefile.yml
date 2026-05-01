@@ -100,4 +100,4 @@ jobs:
           prerelease: true
           files: |
             tf2patcher.AppImage
-            tf2patcher
+            bin/tf2patcher
