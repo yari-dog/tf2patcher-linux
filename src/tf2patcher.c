@@ -11,6 +11,17 @@
 // platform-dependent code
 // TODO implement these for linux
 #ifdef WINDOWS
+// the memory values to use for patching
+// CConfirmCustomizeTextureDialog::PerformFilter
+unsigned char pattern[] = {0xBA, 0x04, 0x00, 0x00, 0x00, 0x48, 0x8B,
+                           0xFF, 0xFF, 0x90, 0xFF, 0xFF, 0x00, 0x00,
+                           0x48, 0x8B, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                           0xE8, 0xFF, 0xFF, 0xFF, 0xFF, 0x85, 0xFF};
+int addr_bump = 21;
+
+unsigned char pattern2[] = {0x80, 0x3D, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x74};
+unsigned char patch2[] = {0xEB};
+int patch_sz2 = 1;
 
 // acquire hwnd to tf2 window
 // wait if the window is not there yet
@@ -125,6 +136,20 @@ void free_resources(void) {
 }
 
 #elif defined(LINUX)
+// the memory values to use for patching
+// CConfirmCustomizeTextureDialog::PerformFilter
+unsigned char pattern[] = {0x48, 0x89, 0xFF, 0xFF, 0x48, 0x8b, 0xFF,
+                           0x48, 0x8b, 0xFF, 0xFF, 0x90, 0xFF, 0xFF,
+                           0x00, 0x00, 0x48, 0x8B, 0xFF, 0xFF, 0xFF,
+                           0xFF, 0xFF, 0xE8, 0xFF, 0xFF, 0xFF, 0xFF};
+int addr_bump = 23;
+
+// NOTE: this patches a different jump to the windows version. it gives the
+// same effect, i just found this JLE before i found the JZ.
+unsigned char pattern2[] = {0x80, 0xA0, 0xFF, 0xFF, 0xFF, 0xFF, 0xC0, 0x0F};
+unsigned char patch2[] = {0x48, 0xE9};
+int patch_sz2 = 2;
+
 bool get_client_so(void) { return 1; }
 
 bool attach_to_tf2(void) {
@@ -229,31 +254,7 @@ bool calc_client_module_bounds(void) {
 bool do_patch(void) {
   printf("Patching...\n");
 
-// CConfirmCustomizeTextureDialog::PerformFilter
-#ifdef WINDOWS
-  unsigned char pattern[] = {0xBA, 0x04, 0x00, 0x00, 0x00, 0x48, 0x8B,
-                             0xFF, 0xFF, 0x90, 0xFF, 0xFF, 0x00, 0x00,
-                             0x48, 0x8B, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-                             0xE8, 0xFF, 0xFF, 0xFF, 0xFF, 0x85, 0xFF};
-  int addr_bump = 21;
-
-  unsigned char pattern2[] = {0x80, 0x3D, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x74};
-  unsigned char patch2[] = {0xEB};
-  int patch_sz2 = 1;
-#elif defined(LINUX)
-  unsigned char pattern[] = {0x48, 0x89, 0xFF, 0xFF, 0x48, 0x8b, 0xFF,
-                             0x48, 0x8b, 0xFF, 0xFF, 0x90, 0xFF, 0xFF,
-                             0x00, 0x00, 0x48, 0x8B, 0xFF, 0xFF, 0xFF,
-                             0xFF, 0xFF, 0xE8, 0xFF, 0xFF, 0xFF, 0xFF};
-  int addr_bump = 23;
-
-  // NOTE: this patches a different jump to the windows version. it gives the
-  // same effect, i just found this JLE before i found the JZ.
-  unsigned char pattern2[] = {0x80, 0xA0, 0xFF, 0xFF, 0xFF, 0xFF, 0xC0, 0x0F};
-  unsigned char patch2[] = {0x48, 0xE9};
-  int patch_sz2 = 2;
-#endif
-
+  // CConfirmCustomizeTextureDialog::PerformFilter
   unsigned char *addr = find_mem_cl(pattern, sizeof(pattern));
   if (!addr) {
     fprintf(stderr,
@@ -294,7 +295,7 @@ bool do_patch(void) {
 
 int main(int argc, char *argv[]) {
   printf("  -------------------------------------------\n"
-         "  |       TF2 decal tool patcher 2.0.4       |\n"
+         "  |       TF2 decal tool patcher 2.0.5       |\n"
          "  | (c) default-username, Apr 2020, Mar 2016 |\n"
          "  |                        Updated June 2024 |\n"
 #ifdef LINUX

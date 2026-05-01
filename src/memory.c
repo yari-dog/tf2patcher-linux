@@ -53,6 +53,8 @@ bool set_mem(void *addr, const unsigned char pat[], size_t sz) {
 #elif defined(LINUX)
 // stupid fucking chud function
 bool read_mem(const void *base, void *buf, size_t sz) {
+  assert(base && buf && sz && pinfo.mem_fd);
+
   if (pread(pinfo.mem_fd, buf, sz, (off_t)base) != (ssize_t)sz) {
     perror("error reading memory");
     return false;
@@ -61,6 +63,8 @@ bool read_mem(const void *base, void *buf, size_t sz) {
 }
 
 bool set_mem(void *addr, const unsigned char pat[], size_t sz) {
+  assert(addr && pat && sz && pinfo.mem_fd);
+
   if ((ssize_t)sz != pwrite(pinfo.mem_fd, pat, sz, (off_t)addr)) {
     perror("Error writing bytes");
     return false;
